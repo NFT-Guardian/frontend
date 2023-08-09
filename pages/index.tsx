@@ -4,6 +4,8 @@ import Head from 'next/head';
 import styles from '../styles/Home.module.css';
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { InjectedConnector } from 'wagmi/connectors/injected'
+import { Button, Box } from '@mui/material';
+
 
 const Home: NextPage = () => {
   const { address, isConnected } = useAccount()
@@ -20,14 +22,19 @@ const Home: NextPage = () => {
           name="description"
         />
         <link href="/favicon.ico" rel="icon" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+
       </Head>
 
       <main className={styles.main}>
+        <header>
+          <img src="" alt="" className='header-img' />
+        </header>
         { isConnected ? (
-          <div>
-            Connected to {address}
-          <button onClick={() => disconnect()}>Disconnect</button>
-        </div>
+          <Box sx={{ textAlign: 'center' }}>
+            <p>Connected to {address}</p>
+            <Button variant="contained" onClick={() => disconnect()}>Disconnect</Button>
+          </Box>
         ) : (
           <ConnectButton />
         )}
