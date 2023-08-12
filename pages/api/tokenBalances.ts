@@ -30,12 +30,13 @@ async function getSingleTokenBalance(chain: string, address: string, tokenAddres
 
 async function getAllTokenBalances(chain: string, address: string) {
     const tokens = TokenList.getSupportedTokens(chain);
-    const values = await Promise.all(tokens.map(async (token) => {
+    const results = await Promise.all(tokens.map(async (token) => {
         const balance = await getSingleTokenBalance(chain, address, token.address);
         if (balance > 0) {
             return ({ token: token, balance: balance });
         }
     }));
+    const values = results.filter(Boolean);
     return values;
 }
 
