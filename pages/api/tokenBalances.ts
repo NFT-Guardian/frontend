@@ -17,8 +17,9 @@ const key = {
 async function getSingleTokenBalance(chain: string, address: string, tokenAddress: string) {
     switch (chain) {
         case 'ethereum':
-            const balance = await getSingleTokenBalanceEth(chain, address, tokenAddress);
-            return balance;
+            return await getSingleTokenBalanceEth(chain, address, tokenAddress);
+        case 'goerli':
+            return await getSingleTokenBalanceEth(chain, address, tokenAddress);
         // case 'optimism':
         //     return getSingleTokenBalanceOp(chain, address, tokenAddress);
         // case 'base':
@@ -30,18 +31,50 @@ async function getSingleTokenBalance(chain: string, address: string, tokenAddres
 
 async function getAllTokenBalances(chain: string, address: string) {
     const tokens = TokenList.getSupportedTokens(chain);
-    const results = await Promise.all(tokens.map(async (token) => {
+    let results = await Promise.all(tokens.map(async (token) => {
         const balance = await getSingleTokenBalance(chain, address, token.address);
         if (balance > 0) {
             return ({ token: token, balance: balance });
         }
     }));
+
+    const native = await getNativeTokenBalance(chain, address)
+    if (native > 0)
+        results.push({
+            token: {
+                name: 'Eth', address: '0x0000000000000000000000000000000000000000', symbol: 'ETH', decimals: 18, chainId: 1, logoURI: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png'
+            }, balance: native
+        });
+
     const values = results.filter(Boolean);
     return values;
 }
 
+async function getNativeTokenBalance(chain: string, address: string) {
+    let url = `https://api.etherscan.io/api?module=account&action=balance&address=${address}&tag=latest&apikey=${key.etherscan}`;
+    if (chain === 'goerli') {
+        url = `https://api-goerli.etherscan.io/api?module=account&action=balance&address=${address}&tag=latest&apikey=${key.etherscan}`;
+        console.log(url);
+    }
+    try {
+        const response = await fetch(url)
+        const data = await response.json();
+        if (data.status === '1') {
+            return data.result;
+        } else {
+            throw new Error('Error fetching token balances');
+        }
+    } catch (error) {
+        console.error(error);
+        throw new Error('Error fetching token balances');
+    }
+}
+
 async function getSingleTokenBalanceEth(chain: string, address: string, tokenAddress: string) {
-    const url = `https://api.etherscan.io/api?module=account&action=tokenbalance&contractaddress=${tokenAddress}&address=${address}&tag=latest&apikey=${key.etherscan}`;
+    let url = `https://api.etherscan.io/api?module=account&action=tokenbalance&contractaddress=${tokenAddress}&address=${address}&tag=latest&apikey=${key.etherscan}`;
+    if (chain === 'goerli') {
+        url = `https://api-goerli.etherscan.io/api?module=account&action=tokenbalance&contractaddress=${tokenAddress}&address=${address}&tag=latest&apikey=${key.etherscan}`;
+    }
     try {
         const response = await fetch(url)
         const data = await response.json();
