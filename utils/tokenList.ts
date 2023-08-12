@@ -1,22 +1,7 @@
 // supported tokens on uniswap (by https://tokenlists.org) : https://gateway.ipfs.io/ipns/tokens.uniswap.org
 
+import { Token } from "./Types";
 import ChainList from "./chainList";
-
-interface Token {
-    name: string;
-    address: string;
-    symbol: string;
-    decimals: number;
-    chainId: number;
-    logoURI: string;
-    extensions?: {
-        bridgeInfo: {
-            [chainId: string]: {
-                tokenAddress: string;
-            }
-        }
-    }
-}
 
 export default class TokenList {
 
