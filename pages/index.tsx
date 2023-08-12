@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { NextPage } from 'next';
 import Head from 'next/head';
-import { Box, Button, Container, Avatar } from '@mui/material';
+import { Box, Button, Container, Avatar, Typography, Paper, CircularProgress } from '@mui/material';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useDisconnect, useNetwork } from 'wagmi';
 import styles from '../styles/Home.module.css';
@@ -24,23 +24,25 @@ function useFetchData(chain: string, address: `0x${string}`) {
   const [error, setError] = useState<ErrorType | null>(null);
 
   useEffect(() => {
+    if (!chain || !address) return;
     fetch(`/api/tokenBalances?chain=${chain}&address=${address}`)
       .then(async response => {
         if (!response.ok) {
-          console.error(response);
-          throw new Error('Network response was not ok');
+          console.error(`Error: ${response.status} ${response.statusText}`);
+          throw new Error(`Network response was not ok: ${response.status} ${response.statusText}`);
         }
         return response.json();
       })
       .then(data => {
         setData(data);
         setLoading(false);
+        setError(null);
       })
       .catch(error => {
         setError({ message: error.message });
         setLoading(false);
       });
-  }, []);
+  }, [chain, address]);
 
   return { data, loading, error };
 }
