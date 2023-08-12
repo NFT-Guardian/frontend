@@ -52,10 +52,42 @@ const Home: NextPage = () => {
   const { data, loading, error }: { data: DataType[] | null, loading: boolean, error: ErrorType } = useFetchData(chain?.name.toLocaleLowerCase() || '', address || DEFAULT_ADDRESS);
 
   const displayContent = () => {
-    if (loading) return <div>Loading...</div>;
-    if (error) return <div>Error: {error.message}</div>;
-    if (data?.length === 0) return <div>No supported token on this chain</div>;
-    if (data?.length) return <div>Data: {JSON.stringify(data)}</div>;
+    if (!chain) return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="10vh">
+        <Typography variant="subtitle1" color="textSecondary">
+          Connect to a wallet to see token balances
+        </Typography>
+      </Box>
+    );
+    if (loading) return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="10vh">
+        <CircularProgress />
+      </Box>
+    );
+
+    if (error) return (
+      <Paper elevation={3} style={{ padding: '16px', margin: '16px' }}>
+        <Typography color="error" variant="h6">
+          Error: {error.message}
+        </Typography>
+      </Paper>
+    );
+
+    if (data?.length === 0) return (
+      <Paper elevation={2} style={{ padding: '16px', margin: '16px' }}>
+        <Typography variant="subtitle1" color="textSecondary">
+          No supported token on this chain
+        </Typography>
+      </Paper>
+    );
+
+    if (data?.length) return (
+      <Paper elevation={1} style={{ padding: '16px', margin: '16px' }}>
+        <Typography variant="body1">
+          Data: {JSON.stringify(data)}
+        </Typography>
+      </Paper>
+    );
   };
 
   return (
