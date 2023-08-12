@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import TokenList from '../../utils/tokenList';
 import ChainList from '../../utils/chainList';
+import { Token } from '../../utils/Types';
 
 interface QueryType {
     chain: string;
@@ -8,13 +9,18 @@ interface QueryType {
     [key: string]: any;
 }
 
+type TokenBalance = {
+    token: Token;
+    balance: bigint;
+};
+
 const key = {
     etherscan: process.env.ETHERSCAN_KEY,
     optimism: '0000',
     base: '0000',
 }
 
-async function getSingleTokenBalance(chain: string, address: string, tokenAddress: string) {
+async function getSingleTokenBalance(chain: string, address: string, tokenAddress: string): Promise<bigint> {
     switch (chain) {
         case 'ethereum':
             return await getSingleTokenBalanceEth(chain, address, tokenAddress);
@@ -29,28 +35,32 @@ async function getSingleTokenBalance(chain: string, address: string, tokenAddres
     }
 }
 
-async function getAllTokenBalances(chain: string, address: string) {
+async function getAllTokenBalances(chain: string, address: string): Promise<TokenBalance[]> {
     const tokens = TokenList.getSupportedTokens(chain);
-    let results = await Promise.all(tokens.map(async (token) => {
+    const balances = await Promise.all(tokens.map(async (token) => {
         const balance = await getSingleTokenBalance(chain, address, token.address);
         if (balance > 0) {
             return ({ token: token, balance: balance });
+        } else {
+            return null;
         }
     }));
 
-    const native = await getNativeTokenBalance(chain, address)
-    if (native > 0)
-        results.push({
+    const nonZeroBalances: TokenBalance[] = balances.filter(item => item !== null) as TokenBalance[];
+
+    const nativeBalance = await getNativeTokenBalance(chain, address)
+    if (nativeBalance > 0) {
+        nonZeroBalances.push({
             token: {
                 name: 'Eth', address: '0x0000000000000000000000000000000000000000', symbol: 'ETH', decimals: 18, chainId: 1, logoURI: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png'
-            }, balance: native
+            }, balance: nativeBalance
         });
+    }
 
-    const values = results.filter(Boolean);
-    return values;
+    return nonZeroBalances;
 }
 
-async function getNativeTokenBalance(chain: string, address: string) {
+async function getNativeTokenBalance(chain: string, address: string): Promise<bigint> {
     let url = `https://api.etherscan.io/api?module=account&action=balance&address=${address}&tag=latest&apikey=${key.etherscan}`;
     if (chain === 'goerli') {
         url = `https://api-goerli.etherscan.io/api?module=account&action=balance&address=${address}&tag=latest&apikey=${key.etherscan}`;
@@ -70,7 +80,7 @@ async function getNativeTokenBalance(chain: string, address: string) {
     }
 }
 
-async function getSingleTokenBalanceEth(chain: string, address: string, tokenAddress: string) {
+async function getSingleTokenBalanceEth(chain: string, address: string, tokenAddress: string): Promise<bigint> {
     let url = `https://api.etherscan.io/api?module=account&action=tokenbalance&contractaddress=${tokenAddress}&address=${address}&tag=latest&apikey=${key.etherscan}`;
     if (chain === 'goerli') {
         url = `https://api-goerli.etherscan.io/api?module=account&action=tokenbalance&contractaddress=${tokenAddress}&address=${address}&tag=latest&apikey=${key.etherscan}`;
