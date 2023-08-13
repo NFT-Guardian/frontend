@@ -10,8 +10,9 @@ import { formatUnits } from 'viem'
 
 const DEFAULT_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-type TokenBalance = {
-  token: Token,
+type TokenBalanceUsdPrice = {
+  token: Token;
+  usdPrice: number;
   balance: bigint;
 };
 
@@ -19,14 +20,13 @@ type ErrorType = {
   message: string;
 } | null;
 
-function useFetchData(chain: string, address: `0x${string}`) {
-  const [data, setData] = useState<TokenBalance[] | null>(null);
+function useFetch(url: string, ...depenceArgs: any[]) {
+  const [data, setData] = useState<TokenBalanceUsdPrice[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<ErrorType | null>(null);
 
   useEffect(() => {
-    if (!chain || !address) return;
-    fetch(`/api/tokenBalances?chain=${chain}&address=${address}`)
+    fetch(url)
       .then(async response => {
         if (!response.ok) {
           console.error(`Error: ${response.status} ${response.statusText}`);
@@ -43,7 +43,7 @@ function useFetchData(chain: string, address: `0x${string}`) {
         setError({ message: error.message });
         setLoading(false);
       });
-  }, [chain, address]);
+  }, depenceArgs);
 
   return { data, loading, error };
 }
@@ -51,11 +51,11 @@ function useFetchData(chain: string, address: `0x${string}`) {
 const Home: NextPage = () => {
   const { address, isConnected } = useAccount()
   const { chain } = useNetwork()
-  const { disconnect } = useDisconnect()
-  const { data, loading, error }: { data: TokenBalance[] | null, loading: boolean, error: ErrorType } = useFetchData(chain?.name.toLocaleLowerCase() || '', address || DEFAULT_ADDRESS);
+  const chainName = chain?.name.toLocaleLowerCase() || ''
+  const { data, loading, error }: { data: TokenBalanceUsdPrice[] | null, loading: boolean, error: ErrorType } = useFetch(`/api/tokenBalances?chain=${chainName}&address=${address || DEFAULT_ADDRESS}`);
 
-  const tokenBlock = (tokenBalance: TokenBalance): JSX.Element => {
-    const { token, balance } = tokenBalance;
+  const tokenBlock = (tokenBalance: TokenBalanceUsdPrice): JSX.Element => {
+    const { token, balance, usdPrice } = tokenBalance;
     const formatedBalance = formatUnits(balance, token.decimals);
     const roundedBalance = parseFloat(formatedBalance).toFixed(2);
     return (
@@ -88,7 +88,7 @@ const Home: NextPage = () => {
             </Typography>
             <Box display={"flex"} alignItems={"flex-end"} fontFamily={"serif"}>
               <Typography variant="h4" fontStyle={'blod'} color="textPrimary">
-                1804
+                {usdPrice.toFixed(2)}
                 {/* TODO: Query the price */}
               </Typography>
               <Typography variant="subtitle2" color="textPrimary">
@@ -101,14 +101,7 @@ const Home: NextPage = () => {
     )
   }
 
-  const displayContent = () => {
-    if (!chain) return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="10vh">
-        <Typography variant="subtitle1" color="textSecondary">
-          Connect to a wallet to see token balances
-        </Typography>
-      </Box>
-    );
+  const displayFetchComponents = () => {
     if (loading) return (
       <Box display="flex" justifyContent="center" alignItems="center" height="10vh">
         <CircularProgress />
@@ -126,13 +119,9 @@ const Home: NextPage = () => {
     if (data?.length === 0) return (
       <Paper elevation={2} style={{ padding: '16px', margin: '16px' }}>
         <Typography variant="subtitle1" color="textSecondary">
-          No supported token on this chain
+          No data to display
         </Typography>
       </Paper>
-    );
-
-    if (data?.length) return (
-      data.map(tokenBlock)
     );
   };
 
@@ -158,7 +147,17 @@ const Home: NextPage = () => {
       </Container>
 
       <Box padding={2}>
-        {displayContent()}
+        {displayFetchComponents()}
+        {(!chain) && (
+          <Box display="flex" justifyContent="center" alignItems="center" height="10vh">
+            <Typography variant="subtitle1" color="textSecondary">
+              Connect to a wallet to see token balances
+            </Typography>
+          </Box>
+        )}
+        {(data?.length && chain) && (
+          data.map(tokenBlock)
+        )}
       </Box>
 
       <footer className={styles.footer}>

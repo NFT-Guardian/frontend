@@ -14,6 +14,12 @@ type TokenBalance = {
     balance: bigint;
 };
 
+type TokenBalanceUsdPrice = {
+    token: Token;
+    usdPrice: number;
+    balance: bigint;
+};
+
 const key = {
     etherscan: process.env.ETHERSCAN_KEY,
     optimism: '0000',
@@ -35,8 +41,26 @@ async function getSingleTokenBalance(chain: string, address: string, tokenAddres
     }
 }
 
+async function getAllTokenBalancesWithPrices(chain: string, address: string): Promise<TokenBalanceUsdPrice[]> {
+    try {
+        const tokenBalances = await getAllTokenBalances(chain, address);
+        const tokenBalancesWithPrices = await Promise.all(tokenBalances.map(async (balance) => {
+            const chainName = balance.token.name.toLocaleLowerCase();
+            const usdPrice = await getUsdPrice(chainName, balance.token.address);
+            console.log('USDPRICE:', usdPrice);
+            return { ...balance, usdPrice };
+        }));
+        return tokenBalancesWithPrices;
+    } catch (error) {
+        console.error("Error in getAllTokenBalancesWithPrices:", error);
+        throw error;
+    }
+}
+
+
 async function getAllTokenBalances(chain: string, address: string): Promise<TokenBalance[]> {
     const tokens = TokenList.getSupportedTokens(chain);
+    // Query balances
     const balances = await Promise.all(tokens.map(async (token) => {
         const balance = await getSingleTokenBalance(chain, address, token.address);
         if (balance > 0) {
@@ -48,6 +72,7 @@ async function getAllTokenBalances(chain: string, address: string): Promise<Toke
 
     const nonZeroBalances: TokenBalance[] = balances.filter(item => item !== null) as TokenBalance[];
 
+    // Query native token
     const nativeBalance = await getNativeTokenBalance(chain, address)
     if (nativeBalance > 0) {
         nonZeroBalances.push({
@@ -60,24 +85,26 @@ async function getAllTokenBalances(chain: string, address: string): Promise<Toke
     return nonZeroBalances;
 }
 
+async function getUsdPrice(chainName: string, tokenAddress: string): Promise<number> {
+    const url = (tokenAddress === '0x0000000000000000000000000000000000000000') ?
+        'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
+        :
+        `https://api.coingecko.com/api/v3/coins/${chainName}/contract/${tokenAddress}`
+        ;
+    const response: any = await fetchUrl(url)
+    if (chainName === 'goerli' || chainName === 'eth') {
+        chainName = 'ethereum';
+    }
+    return response[chainName]?.usd
+}
+
 async function getNativeTokenBalance(chain: string, address: string): Promise<bigint> {
     let url = `https://api.etherscan.io/api?module=account&action=balance&address=${address}&tag=latest&apikey=${key.etherscan}`;
     if (chain === 'goerli') {
         url = `https://api-goerli.etherscan.io/api?module=account&action=balance&address=${address}&tag=latest&apikey=${key.etherscan}`;
         console.log(url);
     }
-    try {
-        const response = await fetch(url)
-        const data = await response.json();
-        if (data.status === '1') {
-            return data.result;
-        } else {
-            throw new Error('Error fetching token balances');
-        }
-    } catch (error) {
-        console.error(error);
-        throw new Error('Error fetching token balances');
-    }
+    return await fetchUrl(url).then(res => res.result);
 }
 
 async function getSingleTokenBalanceEth(chain: string, address: string, tokenAddress: string): Promise<bigint> {
@@ -85,19 +112,23 @@ async function getSingleTokenBalanceEth(chain: string, address: string, tokenAdd
     if (chain === 'goerli') {
         url = `https://api-goerli.etherscan.io/api?module=account&action=tokenbalance&contractaddress=${tokenAddress}&address=${address}&tag=latest&apikey=${key.etherscan}`;
     }
+    return await fetchUrl(url).then(res => res.result);
+}
+
+async function fetchUrl(url: string) {
     try {
         const response = await fetch(url)
         const data = await response.json();
-        if (data.status === '1') {
-            return data.result;
-        } else {
-            throw new Error('Error fetching token balances');
+        if (data.status && data.status !== '1') {
+            throw new Error(data.message);
         }
+        return data;
     } catch (error) {
         console.error(error);
-        throw new Error('Error fetching token balances');
+        throw new Error('Error fetching url');
     }
 }
+
 function getSingleTokenBalanceOp(chain: string, address: string, tokenAddress: string) {
     return null;
 }
@@ -119,7 +150,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(400).json({ error: "Chain not supported" })
     }
 
-    getAllTokenBalances(chain, address).then((values) => {
+    getAllTokenBalancesWithPrices(chain, address).then((values) => {
         res.status(200).json(values);
     })
 }
